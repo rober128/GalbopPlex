@@ -1,4 +1,7 @@
 {
-  "collectionsFilter": [],
-  "environmentFile": null
+  "collectionsFilter": ["REST API basics: CRUD, test & variable"],
+  "environmentFile": null,
+  "globals": {
+    "url": "https://postman-echo.com"
+  }
 }
