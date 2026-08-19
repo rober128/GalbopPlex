@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 
 function getApiKey() {
     try {
@@ -14,7 +15,6 @@ function getApiKey() {
             console.error("Authorization header not found in mcp.json!");
             return null;
         }
-        // Extract API key from header value
         const apiKey = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
         return apiKey;
     } catch (e) {
@@ -36,13 +36,54 @@ function loadConfig() {
     }
 }
 
-const apiKey = getApiKey();
-const config = loadConfig();
-if (apiKey) {
-    console.log("Successfully loaded API key starting with: " + apiKey.substring(0, 8) + "...");
-    console.log("Loaded configuration:", config);
-    process.exit(0);
-} else {
-    console.error("Failed to load API key.");
-    process.exit(1);
+async function fetchCollections(apiKey) {
+    try {
+        const response = await axios.get('https://api.getpostman.com/collections', {
+            headers: { 'X-Api-Key': apiKey }
+        });
+        return response.data.collections;
+    } catch (e) {
+        console.error("Error fetching collections:", e.response?.data || e.message);
+        throw e;
+    }
 }
+
+async function fetchCollectionDetail(apiKey, collectionUid) {
+    try {
+        const response = await axios.get(`https://api.getpostman.com/collections/${collectionUid}`, {
+            headers: { 'X-Api-Key': apiKey }
+        });
+        return response.data.collection;
+    } catch (e) {
+        console.error(`Error fetching collection detail for ${collectionUid}:`, e.response?.data || e.message);
+        throw e;
+    }
+}
+
+async function main() {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        process.exit(1);
+    }
+    const config = loadConfig();
+    console.log("Fetching collections from Postman API...");
+    try {
+        const collections = await fetchCollections(apiKey);
+        console.log(`Found ${collections.length} collections:`);
+        collections.forEach(c => {
+            console.log(`- ${c.name} (UID: ${c.uid})`);
+        });
+
+        if (collections.length > 0) {
+            const first = collections[0];
+            console.log(`Dry-run downloading collection: ${first.name}`);
+            const detail = await fetchCollectionDetail(apiKey, first.uid);
+            console.log(`Downloaded detail for collection: ${detail.info.name}`);
+        }
+    } catch (err) {
+        console.error("Execution failed:", err.message);
+        process.exit(1);
+    }
+}
+
+main();
